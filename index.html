@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Book Scanner — Queen Takes Book</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green-dark: #1a2e1a;
+      --green-mid: #2d4a2d;
+      --green-sage: #7a9e7e;
+      --gold: #A78641;
+      --cream: #E0D4C3;
+      --coral: #EF9E6B;
+      --white: #faf9f6;
+    }
+
+    body {
+      background: var(--green-dark);
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 0 3rem 0;
+      overflow-x: hidden;
+    }
+
+    header {
+      width: 100%;
+      background: var(--green-mid);
+      border-bottom: 1px solid var(--gold);
+      padding: 1.25rem 1.5rem;
+      text-align: center;
+    }
+
+    header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      color: var(--gold);
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      color: var(--green-sage);
+      margin-top: 0.2rem;
+      font-weight: 300;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 480px;
+      padding: 1.5rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Scanner card */
+    .scanner-card {
+      background: var(--green-mid);
+      border-radius: 16px;
+      border: 1px solid rgba(167,134,65,0.3);
+      overflow: hidden;
+    }
+
+    .scanner-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4/3;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .scan-frame {
+      width: 70%;
+      height: 35%;
+      border: 2px solid var(--gold);
+      border-radius: 8px;
+      position: relative;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+    }
+
+    .scan-frame::before,
+    .scan-frame::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-color: var(--coral);
+      border-style: solid;
+    }
+
+    .scan-frame::before {
+      top: -2px; left: -2px;
+      border-width: 3px 0 0 3px;
+      border-radius: 4px 0 0 0;
+    }
+
+    .scan-frame::after {
+      bottom: -2px; right: -2px;
+      border-width: 0 3px 3px 0;
+      border-radius: 0 0 4px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 4px; right: 4px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--coral), transparent);
+      animation: scanline 2s ease-in-out infinite;
+      top: 10%;
+    }
+
+    @keyframes scanline {
+      0%, 100% { top: 10%; opacity: 0.3; }
+      50% { top: 85%; opacity: 1; }
+    }
+
+    .scanner-idle {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(26,46,26,0.95);
+      gap: 0.75rem;
+    }
+
+    .scanner-idle svg {
+      opacity: 0.4;
+    }
+
+    .scanner-idle p {
+      font-size: 0.85rem;
+      color: var(--green-sage);
+      text-align: center;
+      max-width: 200px;
+      line-height: 1.5;
+    }
+
+    .scanner-controls {
+      padding: 1rem 1.25rem;
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 0.8rem 1rem;
+      border: none;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .btn-primary {
+      background: var(--gold);
+      color: var(--green-dark);
+    }
+
+    .btn-primary:hover, .btn-primary:active {
+      background: #c4a050;
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.07);
+      color: var(--cream);
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .btn-secondary:hover, .btn-secondary:active {
+      background: rgba(255,255,255,0.12);
+    }
+
+    /* Status message */
+    .status-bar {
+      padding: 0.7rem 1.25rem;
+      background: rgba(239,158,107,0.1);
+      border-top: 1px solid rgba(239,158,107,0.2);
+      font-size: 0.82rem;
+      color: var(--coral);
+      text-align: center;
+      min-height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+
+    .status-bar.success {
+      background: rgba(122,158,126,0.1);
+      border-color: rgba(122,158,126,0.2);
+      color: var(--green-sage);
+    }
+
+    /* Manual input */
+    .manual-section {
+      background: var(--green-mid);
+      border-radius: 16px;
+      border: 1px solid rgba(167,134,65,0.2);
+      padding: 1rem 1.25rem;
+    }
+
+    .manual-section label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--green-sage);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.6rem;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .manual-section input {
+      flex: 1;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(167,134,65,0.3);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      color: var(--cream);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .manual-section input:focus {
+      border-color: var(--gold);
+    }
+
+    .manual-section input::placeholder {
+      color: rgba(224,212,195,0.3);
+    }
+
+    .btn-lookup {
+      padding: 0.65rem 1rem;
+      background: var(--gold);
+      color: var(--green-dark);
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    .btn-lookup:hover { background: #c4a050; }
+
+    /* Book result card */
+    #result-card {
+      display: none;
+      background: var(--green-mid);
+      border-radius: 16px;
+      border: 1px solid rgba(167,134,65,0.4);
+      overflow: hidden;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-header {
+      padding: 0.75rem 1.25rem;
+      background: rgba(167,134,65,0.1);
+      border-bottom: 1px solid rgba(167,134,65,0.2);
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .result-body {
+      padding: 1.25rem;
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .result-cover {
+      width: 80px;
+      min-width: 80px;
+      height: 115px;
+      object-fit: cover;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .result-cover-placeholder {
+      width: 80px;
+      min-width: 80px;
+      height: 115px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(224,212,195,0.2);
+      font-size: 2rem;
+    }
+
+    .result-meta {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .result-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      color: var(--cream);
+      line-height: 1.3;
+    }
+
+    .result-author {
+      font-size: 0.85rem;
+      color: var(--green-sage);
+    }
+
+    .result-publisher {
+      font-size: 0.8rem;
+      color: rgba(224,212,195,0.5);
+    }
+
+    .result-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.4rem;
+    }
+
+    .tag {
+      padding: 0.2rem 0.6rem;
+      background: rgba(167,134,65,0.15);
+      border: 1px solid rgba(167,134,65,0.25);
+      border-radius: 20px;
+      font-size: 0.72rem;
+      color: var(--gold);
+    }
+
+    .result-details {
+      padding: 0 1.25rem 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+    }
+
+    .detail-item {
+      background: rgba(0,0,0,0.2);
+      border-radius: 8px;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .detail-label {
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: var(--green-sage);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 0.2rem;
+    }
+
+    .detail-value {
+      font-size: 0.82rem;
+      color: var(--cream);
+      word-break: break-all;
+    }
+
+    /* Loading spinner */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(224,212,195,0.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📚 Book Scanner</h1>
+  <p>Queen Takes Book — Barcode Test</p>
+</header>
+
+<div class="container">
+
+  <!-- Scanner Card -->
+  <div class="scanner-card">
+    <div class="scanner-viewport">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="scan-overlay" id="scan-overlay">
+        <div class="scan-frame">
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="scanner-idle" id="scanner-idle">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+          <rect x="7" y="7" width="3" height="10" rx="1"/>
+          <rect x="11" y="7" width="1.5" height="10" rx="0.5"/>
+          <rect x="14" y="7" width="3" height="10" rx="1"/>
+        </svg>
+        <p>Tap "Start Scanner" to activate your camera</p>
+      </div>
+    </div>
+
+    <div class="scanner-controls">
+      <button class="btn btn-primary" id="btn-start" onclick="startScanner()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Start Scanner
+      </button>
+      <button class="btn btn-secondary hidden" id="btn-stop" onclick="stopScanner()">
+        Stop
+      </button>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+      Point camera at a book's barcode
+    </div>
+  </div>
+
+  <!-- Manual ISBN -->
+  <div class="manual-section">
+    <label>Or enter ISBN manually</label>
+    <div class="input-row">
+      <input type="text" id="manual-isbn" placeholder="e.g. 9780743273565" inputmode="numeric" />
+      <button class="btn-lookup" onclick="lookupManual()">Look Up</button>
+    </div>
+  </div>
+
+  <!-- Result Card -->
+  <div id="result-card">
+    <div class="result-header">📖 Book Found</div>
+    <div class="result-body">
+      <div id="cover-container"></div>
+      <div class="result-meta">
+        <div class="result-title" id="result-title"></div>
+        <div class="result-author" id="result-author"></div>
+        <div class="result-publisher" id="result-publisher"></div>
+        <div class="result-tags" id="result-tags"></div>
+      </div>
+    </div>
+    <div class="result-details">
+      <div class="detail-item">
+        <div class="detail-label">ISBN-13 / EAN</div>
+        <div class="detail-value" id="result-isbn13"></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">ISBN-10</div>
+        <div class="detail-value" id="result-isbn10"></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Published</div>
+        <div class="detail-value" id="result-date"></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Pages</div>
+        <div class="detail-value" id="result-pages"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ZBar WASM via CDN -->
+<script type="module">
+  import * as zbarWasm from 'https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js';
+  window.scanImageData = zbarWasm.scanImageData;
+  window.zbarReady = true;
+  console.log('ZBar WASM loaded successfully');
+</script>
+
+<script>
+  const GOOGLE_BOOKS_API_KEY = 'AIzaSyDoh0qmNf0EnAjDBrgQv_XEuKH1Mi3NPRI';
+
+  let videoEl = document.getElementById('video');
+  let stream = null;
+  let scanInterval = null;
+  let lastScanned = null;
+
+  function setStatus(msg, type = '') {
+    const bar = document.getElementById('status-bar');
+    bar.textContent = msg;
+    bar.className = 'status-bar' + (type ? ' ' + type : '');
+  }
+
+  async function startScanner() {
+    setStatus('Requesting camera access...');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+
+      videoEl.srcObject = stream;
+      await videoEl.play();
+
+      document.getElementById('scanner-idle').classList.add('hidden');
+      document.getElementById('btn-start').classList.add('hidden');
+      document.getElementById('btn-stop').classList.remove('hidden');
+
+      setStatus('Scanning... point at a book barcode');
+      startScanLoop();
+
+    } catch (err) {
+      setStatus('Camera error: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  function stopScanner() {
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    videoEl.srcObject = null;
+
+    document.getElementById('scanner-idle').classList.remove('hidden');
+    document.getElementById('btn-start').classList.remove('hidden');
+    document.getElementById('btn-stop').classList.add('hidden');
+    setStatus('Scanner stopped');
+  }
+
+  function startScanLoop() {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    scanInterval = setInterval(async () => {
+      if (!window.zbarReady || !stream || videoEl.readyState < 2) return;
+
+      canvas.width = videoEl.videoWidth;
+      canvas.height = videoEl.videoHeight;
+      ctx.drawImage(videoEl, 0, 0);
+
+      try {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const results = await window.scanImageData(imageData);
+
+        if (results && results.length > 0) {
+          const raw = results[0].decode();
+          if (raw && raw !== lastScanned) {
+            lastScanned = raw;
+            const isbn = raw.replace(/[^0-9X]/gi, '');
+            if (isbn.length >= 10) {
+              setStatus('Barcode detected: ' + isbn);
+              stopScanner();
+              await lookupISBN(isbn);
+            }
+          }
+        }
+      } catch (e) {
+        // scan errors are expected when no barcode visible
+      }
+    }, 300);
+  }
+
+  async function lookupManual() {
+    const val = document.getElementById('manual-isbn').value.trim().replace(/[^0-9X]/gi, '');
+    if (!val) { setStatus('Please enter an ISBN'); return; }
+    await lookupISBN(val);
+  }
+
+  async function lookupISBN(isbn) {
+    setStatus('Looking up book...');
+    document.getElementById('result-card').style.display = 'none';
+
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&key=${GOOGLE_BOOKS_API_KEY}`
+      );
+      const data = await res.json();
+
+      if (!data.items || data.items.length === 0) {
+        setStatus('No book found for ISBN: ' + isbn);
+        return;
+      }
+
+      const info = data.items[0].volumeInfo;
+      const identifiers = info.industryIdentifiers || [];
+      const isbn13 = identifiers.find(i => i.type === 'ISBN_13')?.identifier || isbn;
+      const isbn10 = identifiers.find(i => i.type === 'ISBN_10')?.identifier || '—';
+
+      // Cover
+      const coverContainer = document.getElementById('cover-container');
+      const coverUrl = info.imageLinks?.thumbnail?.replace('http://', 'https://') || null;
+      if (coverUrl) {
+        coverContainer.innerHTML = `<img class="result-cover" src="${coverUrl}" alt="Cover" />`;
+      } else {
+        coverContainer.innerHTML = `<div class="result-cover-placeholder">📚</div>`;
+      }
+
+      document.getElementById('result-title').textContent = info.title || 'Unknown Title';
+      document.getElementById('result-author').textContent =
+        info.authors ? 'by ' + info.authors.join(', ') : 'Author unknown';
+      document.getElementById('result-publisher').textContent =
+        info.publisher || '';
+      document.getElementById('result-isbn13').textContent = isbn13;
+      document.getElementById('result-isbn10').textContent = isbn10;
+      document.getElementById('result-date').textContent =
+        info.publishedDate || '—';
+      document.getElementById('result-pages').textContent =
+        info.pageCount ? info.pageCount + ' pp.' : '—';
+
+      const tagsEl = document.getElementById('result-tags');
+      tagsEl.innerHTML = '';
+      if (info.categories) {
+        info.categories.slice(0, 3).forEach(cat => {
+          const tag = document.createElement('span');
+          tag.className = 'tag';
+          tag.textContent = cat;
+          tagsEl.appendChild(tag);
+        });
+      }
+
+      document.getElementById('result-card').style.display = 'block';
+      setStatus('✓ Book found!', 'success');
+
+    } catch (err) {
+      setStatus('Lookup failed: ' + err.message);
+      console.error(err);
+    }
+  }
+
+  // Allow enter key on manual input
+  document.getElementById('manual-isbn').addEventListener('keydown', e => {
+    if (e.key === 'Enter') lookupManual();
+  });
+</script>
+
+</body>
+</html>
