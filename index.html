@@ -569,13 +569,19 @@
   </div>
 
 </div>
-<script type="module">
-  import * as zbarWasm from 'https://cdn.jsdelivr.net/npm/@undecaf/zbar-wasm@0.11.0/dist/index.js';
-  window.scanImageData = zbarWasm.scanImageData;
-  window.zbarReady = true;
-  console.log('ZBar WASM loaded successfully');
-  // Small delay to ensure debug() is available
-  setTimeout(() => debug('✓ ZBar WASM ready'), 500);
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script>
+  // Wait for ZXing UMD to be available
+  function waitForZXing() {
+    if (window.ZXing && window.ZXing.BrowserMultiFormatReader) {
+      window.zxingReader = new window.ZXing.BrowserMultiFormatReader();
+      window.zbarReady = true;
+      setTimeout(() => debug('✓ ZXing loaded and ready'), 300);
+    } else {
+      setTimeout(waitForZXing, 100);
+    }
+  }
+  waitForZXing();
 </script>
 
 <script>
@@ -658,8 +664,8 @@
     const ctx = canvas.getContext('2d');
 
     scanInterval = setInterval(async () => {
-      if (!window.zbarReady) { debug('ZBar not ready yet', 'warn'); return; }
-      if (!stream) { return; }
+      if (!window.zbarReady) { debug('ZXing not ready yet', 'warn'); return; }
+      if (!stream) return;
       if (videoEl.readyState < 2) { debug(`Video not ready: readyState=${videoEl.readyState}`, 'warn'); return; }
 
       frameCount++;
@@ -674,11 +680,10 @@
 
       try {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const results = await window.scanImageData(imageData);
-
-        if (results && results.length > 0) {
-          const raw = results[0].decode();
-          debug(`🎯 DETECTED: "${raw}" (type: ${results[0].typeName})`, 'detect');
+        const result = await window.zxingReader.decodeFromImageData(imageData);
+        if (result) {
+          const raw = result.getText();
+          debug(`🎯 DETECTED: "${raw}"`, 'detect');
           if (raw && raw !== lastScanned) {
             lastScanned = raw;
             const isbn = raw.replace(/[^0-9X]/gi, '');
@@ -687,14 +692,17 @@
               stopScanner();
               await lookupISBN(isbn);
             } else {
-              debug(`Detected but too short for ISBN: "${isbn}" (${isbn.length} chars)`, 'warn');
+              debug(`Too short for ISBN: "${isbn}" (${isbn.length} chars)`, 'warn');
             }
           }
         }
       } catch (e) {
-        if (frameCount % 20 === 0) debug(`Scan error: ${e.message}`, 'warn');
+        // NotFoundException is normal when no barcode visible - only log other errors
+        if (e.name !== 'NotFoundException' && frameCount % 20 === 0) {
+          debug(`Scan error: ${e.name}: ${e.message}`, 'warn');
+        }
       }
-    }, 300);
+    }, 400);
   }
 
   async function lookupManual() {
