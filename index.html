@@ -679,8 +679,7 @@
       ctx.drawImage(videoEl, 0, 0);
 
       try {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const result = await window.zxingReader.decodeFromImageData(imageData);
+        const result = window.zxingReader.decodeFromCanvas(canvas);
         if (result) {
           const raw = result.getText();
           debug(`🎯 DETECTED: "${raw}"`, 'detect');
